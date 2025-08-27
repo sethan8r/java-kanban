@@ -8,7 +8,7 @@ public class Epic extends Task {
     private List<Integer> subtasksId = new ArrayList<>();
 
     public Epic(String name, String description, int id, Status status) {
-        super(name, description, id, status);
+        super(name, description, id, Status.NEW);
     }
 
     public Epic(String name, String description) {
@@ -21,20 +21,6 @@ public class Epic extends Task {
 
     public void setSubtasksId(List<Integer> subtasksId) {
         this.subtasksId = subtasksId;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        Epic epic = (Epic) o;
-        return Objects.equals(subtasksId, epic.subtasksId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), subtasksId);
     }
 
     @Override
