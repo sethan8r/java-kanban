@@ -82,7 +82,7 @@ public class InMemoryTaskManagerTest {
     void epicShouldNotContainItselfAsSubtask() {
         taskManager.createEpic(epic);
         Subtask subtask = new Subtask("Subtask", "Description", epic.getId());
-        subtask.setId(epic.getId()); // пытаемся сделать id сабтаска = id эпика
+        subtask.setId(epic.getId());
 
         assertThrows(IllegalArgumentException.class,
                 () -> taskManager.createSubtask(subtask),

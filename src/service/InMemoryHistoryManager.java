@@ -4,10 +4,11 @@ import interfaces.HistoryManager;
 import model.Task;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 public class InMemoryHistoryManager implements HistoryManager {
-    private final ArrayList<Integer> history = new ArrayList<>();
+    private final LinkedList<Integer> history = new LinkedList<>();
     private static final int MAX_HISTORY_SIZE = 10;
 
     @Override
@@ -22,6 +23,6 @@ public class InMemoryHistoryManager implements HistoryManager {
     @Override
     public List<Integer> getHistory() {
 
-        return new ArrayList<>(history);
+        return new LinkedList<>(history);
     }
 }
