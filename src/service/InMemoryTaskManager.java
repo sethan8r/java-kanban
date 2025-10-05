@@ -1,5 +1,6 @@
 package service;
 
+import exception.NotFoundException;
 import interfaces.HistoryManager;
 import interfaces.TaskManager;
 import model.Epic;
@@ -59,7 +60,7 @@ public class InMemoryTaskManager implements TaskManager {
     public Task getTaskById(int id) {
         Task task = tasks.get(id);
 
-        if(task != null) historyManager.add(task);
+        if (task != null) historyManager.add(task);
 
         return task;
     }
@@ -68,7 +69,7 @@ public class InMemoryTaskManager implements TaskManager {
     public Epic getEpicById(int id) {
         Epic epic = epics.get(id);
 
-        if(epic != null) historyManager.add(epic);
+        if (epic != null) historyManager.add(epic);
 
         return epic;
     }
@@ -77,14 +78,14 @@ public class InMemoryTaskManager implements TaskManager {
     public Subtask getSubtaskById(int id) {
         Subtask subtask = subtasks.get(id);
 
-        if(subtask != null) historyManager.add(subtask);
+        if (subtask != null) historyManager.add(subtask);
 
         return subtask;
     }
 
     @Override
     public void createTask(Task task) {
-        if(task == null) throw new IllegalArgumentException("Передан null объект");
+        if (task == null) throw new IllegalArgumentException("Передан null объект");
 
         task.setId(nextId++);
         tasks.put(task.getId(), task);
@@ -92,7 +93,7 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void createEpic(Epic epic) {
-        if(epic == null) throw new IllegalArgumentException("Передан null объект");
+        if (epic == null) throw new IllegalArgumentException("Передан null объект");
 
         epic.setId(nextId++);
         epics.put(epic.getId(), epic);
@@ -100,12 +101,12 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void createSubtask(Subtask subtask) {
-        if(subtask == null) throw new IllegalArgumentException("Передан null объект");
+        if (subtask == null) throw new IllegalArgumentException("Передан null объект");
 
         int epicId = subtask.getEpicId();
         Epic epic = epics.get(epicId);
 
-        if (epic == null) throw new IllegalArgumentException("Объекта с ID " + epicId + " не существует");
+        if (epic == null) throw new NotFoundException("Объекта с ID " + epicId + " не существует");
 
         if (subtask.getId() == epicId) {
             throw new IllegalArgumentException("Подзадача не может иметь тот же ID, что и её эпик");
@@ -120,8 +121,8 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void updateTask(Task task) {
-        if(task == null) throw new IllegalArgumentException("Передан null объект");
-        if(!tasks.containsKey(task.getId())) throw new IllegalArgumentException("Объекта с ID " + task.getId()
+        if (task == null) throw new IllegalArgumentException("Передан null объект");
+        if (!tasks.containsKey(task.getId())) throw new NotFoundException("Объекта с ID " + task.getId()
                 + " не существует");
 
         tasks.put(task.getId(), task);
@@ -129,8 +130,8 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void updateEpic(Epic epic) {
-        if(epic == null) throw new IllegalArgumentException("Передан null объект");
-        if(!epics.containsKey(epic.getId())) throw new IllegalArgumentException("Объекта с ID " + epic.getId()
+        if (epic == null) throw new IllegalArgumentException("Передан null объект");
+        if (!epics.containsKey(epic.getId())) throw new NotFoundException("Объекта с ID " + epic.getId()
                 + " не существует");
 
         epics.put(epic.getId(), epic);
@@ -138,10 +139,10 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void updateSubtask(Subtask subtask) {
-        if(subtask == null) throw new IllegalArgumentException("Передан null объект");
-        if(!subtasks.containsKey(subtask.getId())) throw new IllegalArgumentException("Объекта с ID " +
+        if (subtask == null) throw new IllegalArgumentException("Передан null объект");
+        if (!subtasks.containsKey(subtask.getId())) throw new NotFoundException("Объекта с ID " +
                 subtask.getId() + " не существует");
-        if(!epics.containsKey(subtask.getEpicId())) throw new IllegalArgumentException("Объекта с ID " +
+        if (!epics.containsKey(subtask.getEpicId())) throw new NotFoundException("Объекта с ID " +
                 subtask.getEpicId() + " не существует");
 
         subtasks.put(subtask.getId(), subtask);
@@ -152,40 +153,48 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void deleteTaskById(int id) {
-        if(!tasks.containsKey(id)) throw new IllegalArgumentException("Объекта с ID " + id
+        if (!tasks.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
         tasks.remove(id);
+
+        historyManager.remove(id);
     }
 
     @Override
     public void deleteEpicById(int id) {
-        if(!epics.containsKey(id)) throw new IllegalArgumentException("Объекта с ID " + id
+        if (!epics.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
         Epic epic = epics.get(id);
         List<Integer> subtaskId = epic.getSubtasksId();
-        for(Integer sId : subtaskId) {
+        for (Integer sId : subtaskId) {
             subtasks.remove(sId);
+
+            historyManager.remove(sId);
         }
         epics.remove(id);
+
+        historyManager.remove(id);
     }
 
     @Override
     public void deleteSubtaskById(int id) {
-        if(!subtasks.containsKey(id)) throw new IllegalArgumentException("Объекта с ID " + id
+        if (!subtasks.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
         Epic epic = epics.get(subtasks.get(id).getEpicId());
-        epic.getSubtasksId().remove(id);
+        epic.getSubtasksId().remove((Integer) id);
         updateEpicStatus(epic);
 
         subtasks.remove(id);
+
+        historyManager.remove(id);
     }
 
     @Override
     public List<Subtask> getSubtaskByEpicId(int id) {
-        if(!epics.containsKey(id)) throw new IllegalArgumentException("Объекта с ID " + id
+        if (!epics.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
         Epic epic = epics.get(id);
@@ -200,7 +209,7 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void updateEpicStatus(Epic epic) {
-        if(epic.getSubtasksId().isEmpty()) {
+        if (epic.getSubtasksId().isEmpty()) {
             epic.setStatus(Status.NEW);
             return;
         }
@@ -210,24 +219,24 @@ public class InMemoryTaskManager implements TaskManager {
         boolean allNew = true;
         boolean allDone = true;
 
-        for(int sId : subtaskIds) {
+        for (int sId : subtaskIds) {
             Subtask subtask = subtasks.get(sId);
             Status status = subtask.getStatus();
 
-            if(status != Status.DONE) allDone = false;
+            if (status != Status.DONE) allDone = false;
 
-            if(status != Status.NEW) allNew = false;
+            if (status != Status.NEW) allNew = false;
 
-            if(!allDone && !allNew) break;
+            if (!allDone && !allNew) break;
         }
 
-        if(allNew) epic.setStatus(Status.NEW);
+        if (allNew) epic.setStatus(Status.NEW);
         else if (allDone) epic.setStatus(Status.DONE);
         else epic.setStatus(Status.IN_PROGRESS);
     }
 
     @Override
-    public List<Integer> getHistory() {
+    public List<Task> getHistory() {
 
         return historyManager.getHistory();
     }

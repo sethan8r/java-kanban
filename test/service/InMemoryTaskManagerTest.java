@@ -8,6 +8,8 @@ import model.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class InMemoryTaskManagerTest {
@@ -18,6 +20,7 @@ public class InMemoryTaskManagerTest {
     void beforeEach() {
         taskManager = Managers.getDefault();
         epic = new Epic("Epic", "Description");
+        taskManager.createEpic(epic);
     }
 
     @Test
@@ -115,4 +118,51 @@ public class InMemoryTaskManagerTest {
         assertEquals(task.getStatus(), storedTask.getStatus(), "Статус задачи должен сохраняться");
         assertEquals(task.getId(), storedTask.getId(), "Id задачи должен совпадать");
     }
+
+    @Test
+    void shouldRemoveSubtaskIdsFromEpicWhenDeleted() {
+        Subtask subtask1 = new Subtask("Sub1", "Desc1", epic.getId());
+        Subtask subtask2 = new Subtask("Sub2", "Desc2", epic.getId());
+
+        taskManager.createSubtask(subtask1);
+        taskManager.createSubtask(subtask2);
+
+        assertEquals(2, taskManager.getSubtaskByEpicId(epic.getId()).size());
+
+        taskManager.deleteSubtaskById(subtask1.getId());
+
+        List<Subtask> remainingSubtasks = taskManager.getSubtaskByEpicId(epic.getId());
+        assertEquals(1, remainingSubtasks.size());
+        assertEquals(subtask2.getId(), remainingSubtasks.getFirst().getId());
+
+        assertNull(taskManager.getSubtaskById(subtask1.getId()), "Удаленная подзадача должна возвращать null");
+    }
+
+    @Test
+    void shouldRemoveTaskFromHistoryWhenDeleted() {
+        Task task = new Task("Name", "Desc", 1, Status.NEW);
+
+        taskManager.createTask(task);
+        taskManager.getTaskById(task.getId());
+
+        assertEquals(1, taskManager.getHistory().size());
+
+        taskManager.deleteTaskById(task.getId());
+
+        assertTrue(taskManager.getHistory().isEmpty(), "История должна быть пустой после удаления задачи");
+    }
+
+    @Test
+    void shouldUpdateEpicStatusWhenSubtaskChangedViaSetter() {
+        Subtask subtask = new Subtask("Name", "Desc", epic.getId());
+        taskManager.createSubtask(subtask);
+
+        subtask.setStatus(Status.DONE);
+
+        taskManager.updateSubtask(subtask);
+
+        assertEquals(Status.DONE, epic.getStatus(), "Статус эпика должен обновиться");
+    }
+
+
 }
