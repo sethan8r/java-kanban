@@ -65,4 +65,8 @@ public class Task {
     public int hashCode() {
         return Objects.hashCode(id);
     }
+
+    public TaskType getType() {
+        return TaskType.TASK;
+    }
 }
