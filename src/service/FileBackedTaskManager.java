@@ -32,18 +32,21 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
                     nextId = id + 1;
                 }
 
-                if (task instanceof Epic) {
-                    epics.put(id, (Epic) task);
-                } else if (task instanceof Subtask subtask) {
-                    subtasks.put(id, subtask);
-
-                    Epic epic = epics.get(subtask.getEpicId());
-
-                    if (epic != null) {
-                        epic.getSubtasksId().add(id);
-                    }
-                } else {
-                    tasks.put(id, task);
+                switch (task.getType()) {
+                    case EPIC:
+                        epics.put(id, (Epic) task);
+                        break;
+                    case SUBTASK:
+                        Subtask subtask = (Subtask) task;
+                        subtasks.put(id, subtask);
+                        Epic epic = epics.get(subtask.getEpicId());
+                        if (epic != null) {
+                            epic.getSubtasksId().add(id);
+                        }
+                        break;
+                    case TASK:
+                        tasks.put(id, task);
+                        break;
                 }
             }
         } catch (Exception e) {
@@ -72,21 +75,15 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
     }
 
     private String toString(Task task) {
-        String type;
         String epicId = "";
 
-        if (task instanceof Epic) {
-            type = TaskType.EPIC.toString();
-        } else if (task instanceof Subtask) {
-            type = TaskType.SUBTASK.toString();
+        if (task.getType() == TaskType.SUBTASK) {
             epicId = String.valueOf(((Subtask) task).getEpicId());
-        } else {
-            type = TaskType.TASK.toString();
         }
 
         return String.format("%d,%s,%s,%s,%s,%s",
                 task.getId(),
-                type,
+                task.getType(),
                 task.getName(),
                 task.getStatus(),
                 task.getDescription(),
