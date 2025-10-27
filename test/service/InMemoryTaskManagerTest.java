@@ -8,6 +8,8 @@ import model.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -164,5 +166,88 @@ public class InMemoryTaskManagerTest {
         assertEquals(Status.DONE, epic.getStatus(), "Статус эпика должен обновиться");
     }
 
+    @Test
+    void epicStatusWhenAllSubtasksNew() {
+        Subtask subtask1 = new Subtask("Sub1", "Desc1", epic.getId());
+        subtask1.setStatus(Status.NEW);
+        Subtask subtask2 = new Subtask("Sub2", "Desc2", epic.getId());
+        subtask2.setStatus(Status.NEW);
 
+        taskManager.createSubtask(subtask1);
+        taskManager.createSubtask(subtask2);
+
+        assertEquals(Status.NEW, epic.getStatus(), "Статус эпика должен быть NEW");
+    }
+
+    @Test
+    void epicStatusWhenAllSubtasksDone() {
+        Subtask subtask1 = new Subtask("Sub1", "Desc1", epic.getId());
+        subtask1.setStatus(Status.DONE);
+        Subtask subtask2 = new Subtask("Sub2", "Desc2", epic.getId());
+        subtask2.setStatus(Status.DONE);
+
+        taskManager.createSubtask(subtask1);
+        taskManager.createSubtask(subtask2);
+
+        assertEquals(Status.DONE, epic.getStatus(), "Статус эпика должен быть DONE");
+    }
+
+    @Test
+    void epicStatusWhenSubtasksNewAndDone() {
+        Subtask subtask1 = new Subtask("Sub1", "Desc1", epic.getId());
+        subtask1.setStatus(Status.NEW);
+        Subtask subtask2 = new Subtask("Sub2", "Desc2", epic.getId());
+        subtask2.setStatus(Status.DONE);
+
+        taskManager.createSubtask(subtask1);
+        taskManager.createSubtask(subtask2);
+
+        assertEquals(Status.IN_PROGRESS, epic.getStatus(), "Статус эпика должен быть IN_PROGRESS");
+    }
+
+    @Test
+    void epicStatusWhenAllSubtasksInProgress() {
+        Subtask subtask1 = new Subtask("Sub1", "Desc1", epic.getId());
+        subtask1.setStatus(Status.IN_PROGRESS);
+        Subtask subtask2 = new Subtask("Sub2", "Desc2", epic.getId());
+        subtask2.setStatus(Status.IN_PROGRESS);
+
+        taskManager.createSubtask(subtask1);
+        taskManager.createSubtask(subtask2);
+
+        assertEquals(Status.IN_PROGRESS, epic.getStatus(), "Статус эпика должен быть IN_PROGRESS");
+    }
+
+    @Test
+    void subtaskHasLinkedEpic() {
+        Subtask subtask = new Subtask("Sub", "Desc", epic.getId());
+        taskManager.createSubtask(subtask);
+
+        assertEquals(epic.getId(), subtask.getEpicId(), "Подзадача должна быть связана с эпиком");
+    }
+
+    @Test
+    void tasksShouldNotOverlapInTime() {
+        LocalDateTime startTime = LocalDateTime.now();
+        Task task1 = new Task("Task1", "Desc1", Status.NEW, Duration.ofMinutes(60), startTime);
+        Task task2 = new Task("Task2", "Desc2", Status.NEW, Duration.ofMinutes(30), startTime.plusMinutes(30));
+
+        taskManager.createTask(task1);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            taskManager.createTask(task2);
+        }, "Должно быть исключение при пересечении времени");
+    }
+
+    @Test
+    void tasksWithoutOverlapShouldBeCreated() {
+        LocalDateTime startTime = LocalDateTime.now();
+        Task task1 = new Task("Task1", "Desc1", Status.NEW, Duration.ofMinutes(30), startTime);
+        Task task2 = new Task("Task2", "Desc2", Status.NEW, Duration.ofMinutes(30), startTime.plusHours(1));
+
+        assertDoesNotThrow(() -> {
+            taskManager.createTask(task1);
+            taskManager.createTask(task2);
+        }, "Задачи без пересечения должны создаваться без ошибок");
+    }
 }

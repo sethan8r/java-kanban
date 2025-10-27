@@ -4,6 +4,8 @@ import exception.ManagerSaveException;
 import model.*;
 
 import java.io.*;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 public class FileBackedTaskManager extends InMemoryTaskManager {
     private final File file;
@@ -56,7 +58,7 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     protected void save() {
         try (Writer writer = new FileWriter(file)) {
-            writer.write("id,type,name,status,description,epic\n");
+            writer.write("id,type,name,status,description,epic,duration,startTime\n");
 
             for (Task task : getAllTasks()) {
                 writer.write(toString(task) + "\n");
@@ -76,18 +78,30 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
 
     private String toString(Task task) {
         String epicId = "";
+        String duration = "";
+        String startTime = "";
 
         if (task.getType() == TaskType.SUBTASK) {
             epicId = String.valueOf(((Subtask) task).getEpicId());
         }
 
-        return String.format("%d,%s,%s,%s,%s,%s",
+        if (task.getDuration() != null) {
+            duration = String.valueOf(task.getDuration().toMinutes());
+        }
+
+        if (task.getStartTime() != null) {
+            startTime = task.getStartTime().toString();
+        }
+
+        return String.format("%d,%s,%s,%s,%s,%s,%s,%s",
                 task.getId(),
                 task.getType(),
                 task.getName(),
                 task.getStatus(),
                 task.getDescription(),
-                epicId);
+                epicId,
+                duration,
+                startTime);
     }
 
     private Task fromString(String value) {
@@ -98,21 +112,37 @@ public class FileBackedTaskManager extends InMemoryTaskManager {
         Status status = Status.valueOf(fields[3]);
         String description = fields[4];
         String epicId = fields.length > 5 ? fields[5] : "";
+        String durationStr = fields.length > 6 ? fields[6] : "";
+        String startTimeStr = fields.length > 7 ? fields[7] : "";
+
+        Duration duration = Duration.ZERO;
+        if (!durationStr.isEmpty()) {
+            duration = Duration.ofMinutes(Long.parseLong(durationStr));
+        }
+
+        LocalDateTime startTime = null;
+        if (!startTimeStr.isEmpty()) {
+            startTime = LocalDateTime.parse(startTimeStr);
+        }
 
         switch (type) {
             case TASK:
+                Task task = new Task(name, description, status, duration, startTime);
+                task.setId(id);
 
-                return new Task(name, description, id, status);
+                return task;
             case EPIC:
-                Epic epic = new Epic(name, description, id);
+                Epic epic = new Epic(name, description);
+                epic.setId(id);
                 epic.setStatus(status);
 
                 return epic;
             case SUBTASK:
                 int parentEpicId = Integer.parseInt(epicId);
 
-                return new Subtask(name, description, id, status, parentEpicId);
+                return new Subtask(name, description, id, status, parentEpicId, duration, startTime);
             default:
+
                 throw new IllegalArgumentException("Неизвестный тип задачи");
         }
     }

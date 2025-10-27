@@ -8,9 +8,7 @@ import model.Status;
 import model.Subtask;
 import model.Task;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class InMemoryTaskManager implements TaskManager {
     protected final HistoryManager historyManager = Managers.getDefaultHistory();
@@ -18,6 +16,16 @@ public class InMemoryTaskManager implements TaskManager {
     protected final HashMap<Integer, Task> tasks = new HashMap<>();
     protected final HashMap<Integer, Epic> epics = new HashMap<>();
     protected final HashMap<Integer, Subtask> subtasks = new HashMap<>();
+    protected final TreeSet<Task> sortedTaskByTime = new TreeSet<>((time1, time2) -> {
+        if (time1.getStartTime() == null) {
+            if (time2.getStartTime() == null) {
+                return 0;
+            }
+            return 1;
+        }
+        return time1.getStartTime().compareTo(time2.getStartTime());
+    });
+
 
     protected int nextId = 1;
 
@@ -38,20 +46,36 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void deleteAllTasks() {
+        for (Task t : tasks.values()) {
+            sortedTaskByTime.remove(t);
+        }
+
         tasks.clear();
     }
 
     @Override
     public void deleteAllEpics() {
+        for (Epic epic : epics.values()) {
+            for (Integer sId : epic.getSubtasksId()) {
+                Task sub = subtasks.get(sId);
+                sortedTaskByTime.remove(sub);
+            }
+        }
+
         epics.clear();
         subtasks.clear();
     }
 
     @Override
     public void deleteAllSubtasks() {
+        for (Subtask s : subtasks.values()) {
+            sortedTaskByTime.remove(s);
+        }
+
         for (Epic epic : epics.values()) {
             epic.getSubtasksId().clear();
             updateEpicStatus(epic);
+            epic.updateTimeAndDuration(new ArrayList<>());
         }
         subtasks.clear();
     }
@@ -86,9 +110,11 @@ public class InMemoryTaskManager implements TaskManager {
     @Override
     public void createTask(Task task) {
         if (task == null) throw new IllegalArgumentException("Передан null объект");
+        if (isTimeOverlap(task)) throw new IllegalArgumentException("Задачи пересекаются по времени");
 
         task.setId(nextId++);
         tasks.put(task.getId(), task);
+        sortedTaskByTime.add(task);
     }
 
     @Override
@@ -107,6 +133,7 @@ public class InMemoryTaskManager implements TaskManager {
         Epic epic = epics.get(epicId);
 
         if (epic == null) throw new NotFoundException("Объекта с ID " + epicId + " не существует");
+        if (isTimeOverlap(subtask)) throw new IllegalArgumentException("Задачи пересекаются по времени");
 
         if (subtask.getId() == epicId) {
             throw new IllegalArgumentException("Подзадача не может иметь тот же ID, что и её эпик");
@@ -114,8 +141,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         subtask.setId(nextId++);
         subtasks.put(subtask.getId(), subtask);
+        sortedTaskByTime.add(subtask);
 
         epic.getSubtasksId().add(subtask.getId());
+        epic.updateTimeAndDuration(getSubtaskByEpicId(epicId));
         updateEpicStatus(epic);
     }
 
@@ -124,8 +153,11 @@ public class InMemoryTaskManager implements TaskManager {
         if (task == null) throw new IllegalArgumentException("Передан null объект");
         if (!tasks.containsKey(task.getId())) throw new NotFoundException("Объекта с ID " + task.getId()
                 + " не существует");
+        if (isTimeOverlap(task)) throw new IllegalArgumentException("Задачи пересекаются по времени");
 
+        sortedTaskByTime.remove(tasks.get(task.getId()));
         tasks.put(task.getId(), task);
+        sortedTaskByTime.add(task);
     }
 
     @Override
@@ -144,18 +176,25 @@ public class InMemoryTaskManager implements TaskManager {
                 subtask.getId() + " не существует");
         if (!epics.containsKey(subtask.getEpicId())) throw new NotFoundException("Объекта с ID " +
                 subtask.getEpicId() + " не существует");
+        if (isTimeOverlap(subtask)) throw new IllegalArgumentException("Задачи пересекаются по времени");
 
+        sortedTaskByTime.remove(subtasks.get(subtask.getId()));
         subtasks.put(subtask.getId(), subtask);
+        sortedTaskByTime.add(subtask);
 
         Epic epic = epics.get(subtask.getEpicId());
+        epic.updateTimeAndDuration(getSubtaskByEpicId(epic.getId()));
         updateEpicStatus(epic);
     }
 
     @Override
     public void deleteTaskById(int id) {
+        Task task = tasks.get(id);
+
         if (!tasks.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
+        sortedTaskByTime.remove(task);
         tasks.remove(id);
 
         historyManager.remove(id);
@@ -169,8 +208,9 @@ public class InMemoryTaskManager implements TaskManager {
         Epic epic = epics.get(id);
         List<Integer> subtaskId = epic.getSubtasksId();
         for (Integer sId : subtaskId) {
+            Task sub = subtasks.get(sId);
             subtasks.remove(sId);
-
+            sortedTaskByTime.remove(sub);
             historyManager.remove(sId);
         }
         epics.remove(id);
@@ -180,11 +220,15 @@ public class InMemoryTaskManager implements TaskManager {
 
     @Override
     public void deleteSubtaskById(int id) {
+        Subtask sub = subtasks.get(id);
+
         if (!subtasks.containsKey(id)) throw new NotFoundException("Объекта с ID " + id
                 + " не существует");
 
+        sortedTaskByTime.remove(sub);
         Epic epic = epics.get(subtasks.get(id).getEpicId());
         epic.getSubtasksId().remove((Integer) id);
+        epic.updateTimeAndDuration(getSubtaskByEpicId(epic.getId()));
         updateEpicStatus(epic);
 
         subtasks.remove(id);
@@ -240,4 +284,18 @@ public class InMemoryTaskManager implements TaskManager {
 
         return historyManager.getHistory();
     }
+
+    public List<Task> getSortedTaskByTime() {
+        return new ArrayList<>(sortedTaskByTime);
+    }
+
+    protected boolean isTimeOverlap(Task newTask) {
+        if (newTask.getStartTime() == null) return false;
+
+        return getSortedTaskByTime().stream()
+                .filter(t -> t.getStartTime() != null && !t.equals(newTask))
+                .anyMatch(t -> !(newTask.getEndTime().isBefore(t.getStartTime()) ||
+                        newTask.getStartTime().isAfter(t.getEndTime())));
+    }
+
 }
