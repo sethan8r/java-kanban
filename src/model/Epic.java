@@ -8,8 +8,6 @@ import java.util.List;
 
 public class Epic extends Task {
     private List<Integer> subtasksId = new ArrayList<>();
-    private Duration duration = Duration.ZERO;
-    private LocalDateTime startTime;
     private LocalDateTime endTime;
 
     public Epic(String name, String description) {
@@ -28,38 +26,51 @@ public class Epic extends Task {
         this.subtasksId = subtasksId;
     }
 
+    @Override
     public Duration getDuration() {
-        return duration;
+        return super.getDuration();
     }
 
+    @Override
     public LocalDateTime getStartTime() {
-        return startTime;
+        return super.getStartTime();
     }
 
+    @Override
     public LocalDateTime getEndTime() {
-        return endTime;
+        return super.getEndTime();
     }
 
     public void updateTimeAndDuration(List<Subtask> subtasks) {
         if (subtasks.isEmpty()) {
-            duration = Duration.ZERO;
-            startTime = null;
-            endTime = null;
+            setDuration(Duration.ZERO);
+            setStartTime(null);
             return;
         }
 
-        duration = Duration.ZERO;
-        startTime = null;
-        endTime = null;
+        Duration totalDuration = Duration.ZERO;
+        LocalDateTime earliestStart = null;
+        LocalDateTime latestEnd = null;
 
         for (Subtask s : subtasks) {
             if (s.getStartTime() != null) {
-                if (startTime == null || s.getStartTime().isBefore(startTime)) startTime = s.getStartTime();
+                if (earliestStart == null || s.getStartTime().isBefore(earliestStart)) {
+                    earliestStart = s.getStartTime();
+                }
+
                 LocalDateTime taskEnd = s.getEndTime();
-                if (endTime == null || (taskEnd != null && taskEnd.isAfter(endTime))) endTime = taskEnd;
+                if (taskEnd != null && (latestEnd == null || taskEnd.isAfter(latestEnd))) {
+                    latestEnd = taskEnd;
+                }
             }
-            duration = duration.plus(s.getDuration() != null ? s.getDuration() : Duration.ZERO);
+
+            totalDuration = totalDuration.plus(
+                    s.getDuration() != null ? s.getDuration() : Duration.ZERO
+            );
         }
+
+        setDuration(totalDuration);
+        setStartTime(earliestStart);
     }
 
     @Override

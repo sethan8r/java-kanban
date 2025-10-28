@@ -13,18 +13,11 @@ import java.util.*;
 public class InMemoryTaskManager implements TaskManager {
     protected final HistoryManager historyManager = Managers.getDefaultHistory();
 
-    protected final HashMap<Integer, Task> tasks = new HashMap<>();
+    protected final Map<Integer, Task> tasks = new HashMap<>();
     protected final HashMap<Integer, Epic> epics = new HashMap<>();
     protected final HashMap<Integer, Subtask> subtasks = new HashMap<>();
-    protected final TreeSet<Task> sortedTaskByTime = new TreeSet<>((time1, time2) -> {
-        if (time1.getStartTime() == null) {
-            if (time2.getStartTime() == null) {
-                return 0;
-            }
-            return 1;
-        }
-        return time1.getStartTime().compareTo(time2.getStartTime());
-    });
+    protected final Set<Task> sortedTaskByTime =
+            new TreeSet<>(Comparator.comparing(Task::getStartTime));
 
 
     protected int nextId = 1;
@@ -114,7 +107,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         task.setId(nextId++);
         tasks.put(task.getId(), task);
-        sortedTaskByTime.add(task);
+
+        if (task.getStartTime() != null) {
+            sortedTaskByTime.add(task);
+        }
     }
 
     @Override
@@ -141,7 +137,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         subtask.setId(nextId++);
         subtasks.put(subtask.getId(), subtask);
-        sortedTaskByTime.add(subtask);
+
+        if (subtask.getStartTime() != null) {
+            sortedTaskByTime.add(subtask);
+        }
 
         epic.getSubtasksId().add(subtask.getId());
         epic.updateTimeAndDuration(getSubtaskByEpicId(epicId));
@@ -157,7 +156,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         sortedTaskByTime.remove(tasks.get(task.getId()));
         tasks.put(task.getId(), task);
-        sortedTaskByTime.add(task);
+
+        if (task.getStartTime() != null) {
+            sortedTaskByTime.add(task);
+        }
     }
 
     @Override
@@ -180,7 +182,10 @@ public class InMemoryTaskManager implements TaskManager {
 
         sortedTaskByTime.remove(subtasks.get(subtask.getId()));
         subtasks.put(subtask.getId(), subtask);
-        sortedTaskByTime.add(subtask);
+
+        if (subtask.getStartTime() != null) {
+            sortedTaskByTime.add(subtask);
+        }
 
         Epic epic = epics.get(subtask.getEpicId());
         epic.updateTimeAndDuration(getSubtaskByEpicId(epic.getId()));
@@ -284,18 +289,12 @@ public class InMemoryTaskManager implements TaskManager {
 
         return historyManager.getHistory();
     }
-
-    public List<Task> getSortedTaskByTime() {
-        return new ArrayList<>(sortedTaskByTime);
-    }
-
     protected boolean isTimeOverlap(Task newTask) {
         if (newTask.getStartTime() == null) return false;
 
-        return getSortedTaskByTime().stream()
+        return sortedTaskByTime.stream()
                 .filter(t -> t.getStartTime() != null && !t.equals(newTask))
-                .anyMatch(t -> !(newTask.getEndTime().isBefore(t.getStartTime()) ||
-                        newTask.getStartTime().isAfter(t.getEndTime())));
+                .anyMatch(t -> !(newTask.getEndTime().isBefore(t.getStartTime())
+                        || newTask.getStartTime().isAfter(t.getEndTime())));
     }
-
 }
