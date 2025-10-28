@@ -289,6 +289,7 @@ public class InMemoryTaskManager implements TaskManager {
 
         return historyManager.getHistory();
     }
+
     protected boolean isTimeOverlap(Task newTask) {
         if (newTask.getStartTime() == null) return false;
 
