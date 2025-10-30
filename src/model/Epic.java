@@ -1,5 +1,7 @@
 package model;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,12 +9,12 @@ import java.util.List;
 public class Epic extends Task {
     private List<Integer> subtasksId = new ArrayList<>();
 
-    public Epic(String name, String description, int id) {
-        super(name, description, id, Status.NEW);
-    }
-
     public Epic(String name, String description) {
         super(name, description);
+    }
+
+    public Epic(String name, String description, int id) {
+        super(name, description, id, Status.NEW, Duration.ZERO, null);
     }
 
     public List<Integer> getSubtasksId() {
@@ -21,6 +23,38 @@ public class Epic extends Task {
 
     public void setSubtasksId(List<Integer> subtasksId) {
         this.subtasksId = subtasksId;
+    }
+
+    public void updateTimeAndDuration(List<Subtask> subtasks) {
+        if (subtasks.isEmpty()) {
+            setDuration(Duration.ZERO);
+            setStartTime(null);
+            return;
+        }
+
+        Duration totalDuration = Duration.ZERO;
+        LocalDateTime earliestStart = null;
+        LocalDateTime latestEnd = null;
+
+        for (Subtask s : subtasks) {
+            if (s.getStartTime() != null) {
+                if (earliestStart == null || s.getStartTime().isBefore(earliestStart)) {
+                    earliestStart = s.getStartTime();
+                }
+
+                LocalDateTime taskEnd = s.getEndTime();
+                if (taskEnd != null && (latestEnd == null || taskEnd.isAfter(latestEnd))) {
+                    latestEnd = taskEnd;
+                }
+            }
+
+            totalDuration = totalDuration.plus(
+                    s.getDuration() != null ? s.getDuration() : Duration.ZERO
+            );
+        }
+
+        setDuration(totalDuration);
+        setStartTime(earliestStart);
     }
 
     @Override

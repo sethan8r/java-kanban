@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -83,5 +85,51 @@ public class FileBackedTaskManagerTest {
         Subtask loadedSubtask = loadedManager.getAllSubtasks().getFirst();
         assertEquals("Subtask1", loadedSubtask.getName());
         assertEquals(loadedEpic.getId(), loadedSubtask.getEpicId());
+    }
+
+    @Test
+    void saveToInvalidFileShouldThrowException() {
+        File invalidFile = new File("/invalid/path/tasks.csv");
+        FileBackedTaskManager invalidManager = new FileBackedTaskManager(invalidFile);
+
+        Task task = new Task("Task", "Description", Status.NEW,
+                Duration.ofMinutes(30), LocalDateTime.now());
+
+        assertThrows(Exception.class, () -> {
+            invalidManager.createTask(task);
+        }, "Должно быть исключение при сохранении в невалидный файл");
+    }
+
+    @Test
+    void loadFromFileShouldWorkWithoutException() {
+        Task task = new Task("Task", "Description", Status.NEW,
+                Duration.ofMinutes(30), LocalDateTime.now());
+        manager.createTask(task);
+
+        assertDoesNotThrow(() -> {
+            FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(tempFile);
+        }, "Загрузка из файла не должна вызывать исключение");
+    }
+
+    @Test
+    void loadFromEmptyFileShouldWork() {
+        assertDoesNotThrow(() -> {
+            FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(tempFile);
+        }, "Загрузка из пустого файла не должна вызывать исключение");
+    }
+
+    @Test
+    void saveAndLoadTasksCorrectly() {
+        Task task = new Task("Task", "Description", Status.NEW,
+                Duration.ofMinutes(30), LocalDateTime.now());
+        Epic epic = new Epic("Epic", "Description");
+
+        manager.createTask(task);
+        manager.createEpic(epic);
+
+        FileBackedTaskManager loadedManager = FileBackedTaskManager.loadFromFile(tempFile);
+
+        assertNotNull(loadedManager.getTaskById(task.getId()), "Задача должна загрузиться из файла");
+        assertNotNull(loadedManager.getEpicById(epic.getId()), "Эпик должен загрузиться из файла");
     }
 }
